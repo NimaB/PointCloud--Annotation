@@ -25,6 +25,8 @@ pcl/kdtree/kdtree_flann.h
 -
 pcl/point_types.h
 -
+cmath
+-
 
 /opt/ros/fuerte/include/flann/algorithms/all_indices.h
 flann/general.h

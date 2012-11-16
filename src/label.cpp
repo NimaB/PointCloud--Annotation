@@ -9,6 +9,7 @@
 //#include <pcl/console/parse.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_types.h>
+#include<cmath>
 
 using namespace std;
 
@@ -16,15 +17,20 @@ int i;
 int PointInd;
 Eigen::VectorXi indic;
 
-void ExRaNeighbor(int qpointInd,pcl::PointCloud<pcl::PointXYZRGBL>::Ptr cloud_in,float radius, Eigen::VectorXi label)
+void ExRaNeighbor(int typeOfextract,int qpointInd,pcl::PointCloud<pcl::PointXYZRGBL>::Ptr cloud_in,float radius, Eigen::VectorXi label)
 //this function gets indexes of a points neighbors.
+//Type of extract is 1 for radius extract and 3 for equal height extract.
 {
+	pcl::PointXYZRGBL qpoint = cloud_in->points[qpointInd];
+
+	if(typeOfextract == 1)
+	{
 	pcl::KdTreeFLANN<pcl::PointXYZRGBL> tree;
 	vector<int>   IdRadiusSearch;
 	vector<float> Sdistance;
 
 	tree.setInputCloud(cloud_in);
-    pcl::PointXYZRGBL qpoint = cloud_in->points[qpointInd];
+
 	if(tree.radiusSearch(qpoint,radius,IdRadiusSearch,Sdistance) > 0)
 	{
 		cout<<"Points count= "<<IdRadiusSearch.size()<<endl;
@@ -34,11 +40,28 @@ void ExRaNeighbor(int qpointInd,pcl::PointCloud<pcl::PointXYZRGBL>::Ptr cloud_in
 	label[qpointInd] = 1;
 	cloud_in->points[qpointInd].label = 1;
 	for (size_t k = 0; k < IdRadiusSearch.size(); k++)
-	{
-		label[IdRadiusSearch[k]] = 1;
-		cloud_in->points[IdRadiusSearch[k]].label = 1;
-	}
+		{
+			label[IdRadiusSearch[k]] = 1;
+			cloud_in->points[IdRadiusSearch[k]].label = 1;
 
+		}
+	}
+	else
+	{
+
+    float z = 0;
+    float hq = 0;
+
+    hq = qpoint.x;
+
+	for (size_t k = 0; k < cloud_in->size(); k++)
+	 {
+
+	    z = cloud_in->points[k].x;
+		if(abs(hq - z) <= 0.1)
+		cloud_in->points[k].label = 1;
+	 }
+	}
 }
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
@@ -80,7 +103,7 @@ int
 main (int argc, char** argv)
 //First input arg is the path of the input cloud
 //Second would be the path of the labeled pointcloud
-//Third would be a switch (1: Annotation 2: seeing result)
+//Third would be a switch (1: Annotation 2: seeing result 3:Annotating the floor)
 //The rest args would be radius values for the objects being annotated.
 {
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr basic_cloud_ptr (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -89,7 +112,14 @@ main (int argc, char** argv)
   Eigen::VectorXi LabeledInd;
 
 
+if (argc < 4)
+{
+	cerr<<"The usage is:"<<endl;
+	cerr<<"Annotation {Path of input pointcloud} {Path to save labeled pointcloud} {1:If you are going to annotate, 2:If you want to see the result of annotation}"<<endl;
 
+	}
+else
+{
   if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *basic_cloud_ptr) == -1) //* load the file
    {
      PCL_ERROR ("Couldn't read file \n");
@@ -97,10 +127,13 @@ main (int argc, char** argv)
    }
 
 
-  if(atoi(argv[3]) == 1)
+  if((atoi(argv[3]) == 1) || (atoi(argv[3]) == 3))
   {
   pcl::copyPointCloud(*basic_cloud_ptr,*test);
-  indic.setZero(argc - 4);//initializes indic based on the number of radiuses entered as input.
+  if(atoi(argv[3]) == 1)
+	  indic.setZero(argc - 4);//initializes indic based on the number of radiuses entered as input.
+  else
+	  indic.setZero(2);//In this case we will just need ne point from the floor
 
   std::cout<<"indices:"<<indic.rows()<<std::endl;
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
@@ -112,25 +145,38 @@ main (int argc, char** argv)
 
   while (!viewer->wasStopped ())
   {
-    viewer->spinOnce (100);
-    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+    viewer->spinOnce ();
+    boost::this_thread::sleep (boost::posix_time::microseconds (10));
   }
   cout << "indixes :" << indic << endl;
   cout << "argc = " << argc;
+
+  LabeledInd.setZero(basic_cloud_ptr->size());
+
+  {
   //----------------------------------
   float r;
-  LabeledInd.setZero(basic_cloud_ptr->size());
+
 
   for (int j = 0; j < indic.rows(); j++)
   {
 	  r = (atof(argv[j+4]))/100;
 	  //ExRaNeighbor(indic[j], basic_cloud_ptr, r, LabeledInd);
-	  ExRaNeighbor(indic[j], test, r, LabeledInd);
+	  ExRaNeighbor(atoi(argv[3]),indic[j], test, r, LabeledInd);
   }
 
 cout<<"the result has "<< LabeledInd.rows() <<" rows"<<endl;
-
-//witing the vector to a file
+  }
+//  else
+//  {
+//
+//	  for (size_t i=0; i < test->size(); i++)
+//		  if(test->points[i].z == qpoint.z)
+//		  {
+//			  test->points[i].label = 1;
+//		  }
+//  }
+//writing the vector to a file
 ofstream out;
 out.open("AnnotationTest.txt", ios::out | ios::trunc | ios::binary);
 out << LabeledInd <<endl;
@@ -176,4 +222,5 @@ pcl::io::savePCDFileASCII (argv[2], *test);
 	  if(indic[j])
 	    std::cout << "indice "<< j << std::endl;
 */
+}
 }
