@@ -81,6 +81,11 @@ void pp_callback (const pcl::visualization::PointPickingEvent& event, void* view
 	 cout<<"Number of points is exceeded size of vector!"<< endl;
   cout <<"Point number "<< i <<": "<< PointInd << endl;
   i = i+1;
+  ofstream out;
+  //out.open("objcenter.txt", ios::out | ios::trunc | ios::binary);
+  out.open("objcenter.txt",fstream::in | fstream::out | fstream::app);
+  out << PointInd <<endl;
+  out.close();
 
 }
 //----------------------------------------------------------------------------------
@@ -133,7 +138,7 @@ else
   if(atoi(argv[3]) == 1)
 	  indic.setZero(argc - 4);//initializes indic based on the number of radiuses entered as input.
   else
-	  indic.setZero(2);//In this case we will just need ne point from the floor
+	  indic.setZero(2);//In this case we will just need one point from the floor
 
   std::cout<<"indices:"<<indic.rows()<<std::endl;
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
